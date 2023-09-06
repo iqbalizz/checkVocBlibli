@@ -2,26 +2,13 @@ import fetch from "node-fetch";
 import readlineSync from "readline-sync";
 import chalk from 'chalk';
 import { v4 as uuidv4 } from 'uuid';
+import { banner1, banner2 } from "./utils/banner.js";
 
 const getOauth = (inputNomer, inputPassword, userId, sessionId, requestId) => new Promise((resolve, reject) => {
     const dataString = `grant_type=password&username=${inputNomer}&password=${inputPassword}&client_id=d19b28e9-7c37-47e4-be4b-f6380cc78cce&client_secret=32ce46d4-c0fd-4234-86a0-65390e42ca2b`;
     fetch(`https://account.blibli.com/gdn-oauth/token`, {
         method: 'POST',
         headers: {
-            // 'Host': 'account.blibli.com',
-            // 'Accept': 'application/json',
-            // 'X-Userid': '486b42a9-e900-4183-bfc7-420d4ac8dc3d',
-            // 'X-Sessionid': '9b26459b-87a2-4302-87c7-dc0a65085487',
-            // 'X-Requestid': 'a4cbcb62-3c3f-4ef1-bf1f-de1670aaa55a',
-            // 'User-Agent': 'BlibliAndroid/10.3.1(6345) 486b42a9-e900-4183-bfc7-420d4ac8dc3d Dalvik/2.1.0 (Linux; U; Android 9; SM-G935FD Build/PI)',
-            // 'Accept-Language': 'en',
-            // 'Build-No': '6345',
-            // 'Channelid': 'android',
-            // 'Storeid': '10001',
-            // 'Content-Type': 'application/x-www-form-urlencoded',
-            // 'Content-Length': '159',
-            // 'Accept-Encoding': 'gzip, deflate',
-            // 'Connection': 'close'
             'Host': 'account.blibli.com',
             'Accept': 'application/json',
             'X-Userid': userId,
@@ -94,6 +81,52 @@ const getOuthToken = (token, inputCodeOTP, inputNomer, userId, sessionId, reques
         .catch(error => reject(error))
 });
 
+const getAccountData = (userId, sessionId, requestId, accesToken, inputNomer) => new Promise((resolve, reject) => {
+    fetch(`https://www.blibli.com/backend/mobile/member/account-data?isHomePageLiteConfigured=false`, {
+        headers: {
+            'Host': 'www.blibli.com',
+            'Accept': 'application/json',
+            'X-Userid': userId,
+            'X-Sessionid': sessionId,
+            'X-Requestid': requestId,
+            'User-Agent': `BlibliAndroid/10.4.0(6367) ${userId} Dalvik/2.1.0 (Linux; U; Android 14; sdk_gphone64_x86_64 Build/UPB5.230623.003)`,
+            'Accept-Language': 'en',
+            'Build-No': '6367',
+            'Content-Type': 'application/json; charset=UTF-8',
+            'Channelid': 'android',
+            'Storeid': '10001',
+            'Authorization': `bearer ${accesToken}`,
+            'X-Blibli-User-Email': inputNomer,
+            'Accept-Encoding': 'gzip, deflate'
+        }
+    })
+        .then(res => resolve(res.json()))
+        .catch(error => reject(error))
+});
+
+const getCheckVoucher = (userId, sessionId, requestId, accesToken, email) => new Promise((resolve, reject) => {
+    fetch(`https://www.blibli.com/backend/member-voucher/vouchers?origin=BLIBLI&itemPerPage=25`, {
+        headers: {
+            'Host': 'www.blibli.com',
+            'Accept': 'application/json',
+            'X-Userid': userId,
+            'X-Sessionid': sessionId,
+            'X-Requestid': requestId,
+            'User-Agent': `BlibliAndroid/10.4.0(6367) ${userId} Dalvik/2.1.0 (Linux; U; Android 14; sdk_gphone64_x86_64 Build/UPB5.230623.003)`,
+            'Accept-Language': 'en',
+            'Build-No': '6367',
+            'Content-Type': 'application/json; charset=UTF-8',
+            'Channelid': 'android',
+            'Storeid': '10001',
+            'Authorization': `bearer ${accesToken}`,
+            'X-Blibli-User-Email': email,
+            'Accept-Encoding': 'gzip, deflate'
+        }
+    })
+        .then(res => resolve(res.json()))
+        .catch(error => reject(error))
+});
+
 (async () => {
     // Membuat UUIDv4 acak
     const userId = uuidv4();
@@ -109,7 +142,7 @@ const getOuthToken = (token, inputCodeOTP, inputNomer, userId, sessionId, reques
     //!Get Oauth
     const ouath = await getOauth(inputNomer, inputPassword, userId, sessionId, requestId);
     const error_description = ouath.error_description
-    // console.log(ouath)
+    console.log(ouath)
     if (error_description === 'login using new device is detected, please do challenge otp') {
         const token = ouath.data.challenge.token;
         console.log(`[!] Token kamu : ${token}`)
@@ -126,6 +159,37 @@ const getOuthToken = (token, inputCodeOTP, inputNomer, userId, sessionId, reques
                 console.log(`[!] ${chalk.green(`Berhasil login account!`)}`);
                 const accesToken = getTokenOuth.access_token;
                 console.log(`[!] ${chalk.green(`Acces Token : ${accesToken}`)}`);
+
+                const dataAccount = await getAccountData(userId, sessionId, requestId, accesToken, inputNomer);
+                const namaDepanAcc = dataAccount.firstName;
+                const namaBelakangAcc = dataAccount.lastName;
+                const email = dataAccount.emailAddress;
+                const nomerHP = dataAccount.handphone;
+                const memberLevel = dataAccount.memberLevel;
+                // console.log(dataAccount)
+                //!Banner1
+                console.log(banner1());
+                console.log(`[!] Nama Account Blibli kamu : ${chalk.green(`${namaDepanAcc} ${namaBelakangAcc}`)}`);
+                console.log(`[!] Email Kamu : ${chalk.green(`${email}`)}`);
+                console.log(`[!] Nomer HP : ${chalk.green(`${nomerHP}`)}`);
+                console.log(`[!] Status Level Member : ${chalk.green(`${memberLevel}`)}`);
+                //!Banner2
+                console.log(banner2());
+                const checkVoucher = await getCheckVoucher(userId, sessionId, requestId, accesToken, email)
+                // console.log(checkVoucher)
+                const statusCode = checkVoucher.code;
+                if (statusCode === 200) {
+                    console.log(`[!] ${chalk.green(`Check Voucher!`)}`)
+                    const namaVoucher = checkVoucher.data[0].name;
+                    const minBuy = checkVoucher.data[0].minimumPurchaseMessage;
+                    const reward = checkVoucher.data[0].rewardMessage;
+                    const maksCashback = checkVoucher.data[0].maximumDiscount
+                    console.log(`[!] Voucher : ${chalk.green(namaVoucher)}`);
+                    console.log(`[!] Minimal Pembelian : ${chalk.green(minBuy)}`);
+                    console.log(`[!] Reward : ${chalk.green(reward)}`);
+                    console.log(`[!] Max CashBack : ${chalk.green(maksCashback)}`)
+                }
+
             } else {
                 console.log(`[!] ${chalk.red(`Token is invalid.. OTP salah`)}`);
             }
