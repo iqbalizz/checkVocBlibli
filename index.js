@@ -30,8 +30,8 @@ const getOauth = (inputNomer, inputPassword, userId, sessionId, requestId) => ne
         .catch(error => reject(error))
 });
 
-const getOtpRequest = (token, userId, sessionId, requestId) => new Promise((resolve, reject) => {
-    const dataString = `{"challenge":{"token":"${token}"},"type":"SMS"}`;
+const getOtpRequest = (token, sendOTP, userId, sessionId, requestId) => new Promise((resolve, reject) => {
+    const dataString = `{"challenge":{"token":"${token}"},"type":"${sendOTP}"}`;
     fetch(`https://www.blibli.com/backend/common/users/_request-challenge-code`, {
         method: 'POST',
         headers: {
@@ -142,16 +142,30 @@ const getCheckVoucher = (userId, sessionId, requestId, accesToken, email) => new
     //!Get Oauth
     const ouath = await getOauth(inputNomer, inputPassword, userId, sessionId, requestId);
     const error_description = ouath.error_description
-    console.log(ouath)
+    // console.log(ouath)
     if (error_description === 'login using new device is detected, please do challenge otp') {
         const token = ouath.data.challenge.token;
-        console.log(`[!] Token kamu : ${token}`)
-        const otpRequest = await getOtpRequest(token, userId, sessionId, requestId)
-        console.log(otpRequest);
+        console.log(`[!] Token kamu : ${chalk.green(token)}`)
+        const sendOTP = readlineSync.question(`[?] Send OTP to (SMS/EMAIL) : `)
+        const otpRequest = await getOtpRequest(token, sendOTP, userId, sessionId, requestId)
+        // console.log(otpRequest);
         const status = otpRequest.code;
+
         if (status === 200) {
             console.log(`[!] Kode OTP dikirimkan..`);
-            const inputCodeOTP = readlineSync.question(`[?] Masukkan kode otp : `)
+            let inputCodeOTP;
+            let isValid = false;
+
+            while (!isValid) {
+                inputCodeOTP = readlineSync.question(`[?] Masukkan kode otp (4 karakter): `);
+
+                // Periksa panjang kode OTP
+                if (inputCodeOTP.length === 4) {
+                    isValid = true;
+                } else {
+                    console.log(`[!] ${chalk.red(`Kode OTP harus terdiri dari 4 karakter. Coba lagi.`)}`);
+                }
+            }
             const getTokenOuth = await getOuthToken(token, inputCodeOTP, inputNomer, userId, sessionId, requestId);
             // console.log(getTokenOuth)
             const tokenType = getTokenOuth.token_type;
@@ -179,22 +193,26 @@ const getCheckVoucher = (userId, sessionId, requestId, accesToken, email) => new
                 // console.log(checkVoucher)
                 const statusCode = checkVoucher.code;
                 if (statusCode === 200) {
-                    console.log(`[!] ${chalk.green(`Check Voucher!`)}`)
-                    const namaVoucher = checkVoucher.data[0].name;
-                    const minBuy = checkVoucher.data[0].minimumPurchaseMessage;
-                    const reward = checkVoucher.data[0].rewardMessage;
-                    const maksCashback = checkVoucher.data[0].maximumDiscount
-                    console.log(`[!] Voucher : ${chalk.green(namaVoucher)}`);
-                    console.log(`[!] Minimal Pembelian : ${chalk.green(minBuy)}`);
-                    console.log(`[!] Reward : ${chalk.green(reward)}`);
-                    console.log(`[!] Max CashBack : ${chalk.green(maksCashback)}`)
+                    checkVoucher.data.forEach((voucher, index) => {
+                        console.log(`[!] ${chalk.green(`Check Voucher ${index + 1}!`)}`)
+                        const namaVoucher = voucher.name;
+                        const minBuy = voucher.minimumPurchaseMessage;
+                        const reward = voucher.rewardMessage;
+                        const maksCashback = voucher.maximumDiscount;
+
+                        console.log(`[!] Voucher ${index + 1}: ${chalk.green(namaVoucher)}`);
+                        console.log(`[!] Minimal Pembelian : ${chalk.green(minBuy)}`);
+                        console.log(`[!] Reward : ${chalk.green(reward)}`);
+                        console.log(`[!] Max CashBack : ${chalk.green(maksCashback)}`);
+                        console.log();
+                    });
                 }
 
             } else {
                 console.log(`[!] ${chalk.red(`Token is invalid.. OTP salah`)}`);
             }
         } else {
-            console.log(`[!] ${chalk.red(`Gagal mengirimkan kode OTP!`)}`);
+            console.log(`[!] ${chalk.red(`${otpRequest.errors}`)}`);
         }
     } else {
         console.log(`[!] ${chalk.red('Akun tidak tersedia..')}`);
